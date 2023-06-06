@@ -72,10 +72,15 @@ def Merton_pdf(x, T, mu, sig, lam, muJ, sigJ):
     """
     Merton density function
     """
-    tot = 0
-    for k in range(20):
-        tot += (lam*T)**k * np.exp(-(x-mu*T-k*muJ)**2/( 2*(T*sig**2+k*sigJ**2) ) ) \
-                / (factorial(k) * np.sqrt(2*np.pi * (sig**2*T+k*sigJ**2) ) )  
+    tot = sum(
+        (lam * T) ** k
+        * np.exp(
+            -((x - mu * T - k * muJ) ** 2)
+            / (2 * (T * sig**2 + k * sigJ**2))
+        )
+        / (factorial(k) * np.sqrt(2 * np.pi * (sig**2 * T + k * sigJ**2)))
+        for k in range(20)
+    )
     return np.exp(-lam*T) * tot
 
 

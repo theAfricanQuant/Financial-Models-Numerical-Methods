@@ -52,7 +52,7 @@ def SOR(A, b, w=1, eps=1e-10, N_max = 100):
     """
     
     x0 = b.copy()            # initial guess
-    
+
     if sparse.issparse(A):
         D = sparse.diags(A.diagonal())          # diagonal
         U = sparse.triu(A, k=1)                 # Strict U       
@@ -63,14 +63,14 @@ def SOR(A, b, w=1, eps=1e-10, N_max = 100):
         U = np.triu(A, k=1)                       # Strict U       
         L = np.tril(A, k=-1)                      # Strict L
         DD = (w*L + D)
-    
+
     for i in range(1,N_max+1):
         x_new = solve_triangular( DD, (w*b - w*U@x0 - (w-1)*D@x0), lower=True)
         if norm(x_new - x0) < eps:
             return x_new
         x0 = x_new
         if i==N_max:
-            raise ValueError("Fail to converge in {} iterations".format(i))
+            raise ValueError(f"Fail to converge in {i} iterations")
 
 
 def SOR2(A, b, w=1, eps=1e-10, N_max = 100):
@@ -81,18 +81,15 @@ def SOR2(A, b, w=1, eps=1e-10, N_max = 100):
     N = len(b)
     x0 = np.ones_like(b, dtype=np.float64) # initial guess
     x_new = np.ones_like(x0)               # new solution
-    
+
     for k in range(1,N_max+1):
         for i in range(N):
-            S = 0
-            for j in range(N):
-                if j != i:
-                    S += A[i,j]*x_new[j]
+            S = sum(A[i,j]*x_new[j] for j in range(N) if j != i)
             x_new[i] = (1-w)*x_new[i] + (w/A[i,i]) * (b[i] - S)  
-                   
+
         if norm(x_new - x0) < eps:
             return x_new
         x0 = x_new.copy()
         if k==N_max:
-            print("Fail to converge in {} iterations".format(k))
+            print(f"Fail to converge in {k} iterations")
 

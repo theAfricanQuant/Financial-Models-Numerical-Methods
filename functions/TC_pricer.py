@@ -55,26 +55,26 @@ class TC_pricer():
         delta = np.exp(- self.r * (self.T - T_vec) )           # discount factor
         dx = self.sig * np.sqrt(dt)                            # space step1 
         dy = dx                                                # space step2 
-        M = int(np.floor(N/2))                          
-        y = np.linspace(-M*dy,M*dy,2*M+1)               
+        M = int(np.floor(N/2))
+        y = np.linspace(-M*dy,M*dy,2*M+1)
         N_y = len(y)                                           # dim of vector y 
         med = np.where(y == 0)[0].item()                       # point where y==0 
 
-        F = lambda x,l,n: np.exp(  self.gamma * (1+self.cost_b) * np.exp(x)*l / delta[n] )  
+        F = lambda x,l,n: np.exp(  self.gamma * (1+self.cost_b) * np.exp(x)*l / delta[n] )
         G = lambda x,m,n: np.exp( -self.gamma * (1-self.cost_s) * np.exp(x)*m / delta[n] )
 
-        for portfolio in ["no_opt", TYPE]:     # interates on the zero option and writer/buyer portfolios
+        for portfolio in ["no_opt", TYPE]: # interates on the zero option and writer/buyer portfolios
             
             # Tree nodes at time N
             x = np.array( [x0 + (self.mu - 0.5 * self.sig**2)*dt*N + (2*i-N)*dx for i in range(N+1) ] ) 
 
             # Terminal conditions
-            if portfolio == "no_opt":
-                Q = np.exp( -self.gamma * cost.no_opt(x, y, self.cost_b, self.cost_s) ) 
+            if portfolio == "buyer":
+                Q = np.exp( -self.gamma * cost.buyer(x, y, self.cost_b, self.cost_s, self.K) )
+            elif portfolio == "no_opt":
+                Q = np.exp( -self.gamma * cost.no_opt(x, y, self.cost_b, self.cost_s) )
             elif portfolio == "writer":
                 Q = np.exp( -self.gamma * cost.writer(x, y, self.cost_b, self.cost_s, self.K) )
-            elif portfolio == "buyer":
-                Q = np.exp( -self.gamma * cost.buyer(x, y, self.cost_b, self.cost_s, self.K) )
             else:
                 raise ValueError("TYPE can be only writer or buyer")
 
@@ -82,7 +82,7 @@ class TC_pricer():
             for k in range(N-1,-1,-1):
                 #  expectation term
                 Q_new = ( Q[:-1,:] + Q[1:,:] ) / 2
-                    
+
                 # create the logprice vector at time k
                 x = np.array( [x0 + (self.mu - 0.5 * self.sig**2)*dt*k + (2*i-k)*dx for i in range(k+1) ] )
 
@@ -107,9 +107,8 @@ class TC_pricer():
         else:
             price = (delta[0] / self.gamma) * np.log( Q_no / Q_yes )
 
-        if (Time == True):
-            elapsed = time()-t
-            return price, elapsed
-        else:
+        if Time != True:
             return price
+        elapsed = time()-t
+        return price, elapsed
 

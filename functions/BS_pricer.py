@@ -103,13 +103,15 @@ class BS_pricer():
         """
         k = np.log(self.K/self.S0)
         cf_GBM = partial(cf_normal, mu=( self.r - 0.5 * self.sig**2 )*self.T, sig=self.sig*np.sqrt(self.T))  # function binding
-        
+
         if self.payoff == "call":
-            call = self.S0 * Q1(k, cf_GBM, np.inf) - self.K * np.exp(-self.r*self.T) * Q2(k, cf_GBM, np.inf)   # pricing function
-            return call
+            return self.S0 * Q1(k, cf_GBM, np.inf) - self.K * np.exp(
+                -self.r * self.T
+            ) * Q2(k, cf_GBM, np.inf)
         elif self.payoff == "put":
-            put = self.K * np.exp(-self.r*self.T) * (1 - Q2(k, cf_GBM, np.inf)) - self.S0 * (1-Q1(k, cf_GBM, np.inf))  # pricing function
-            return put
+            return self.K * np.exp(-self.r * self.T) * (
+                1 - Q2(k, cf_GBM, np.inf)
+            ) - self.S0 * (1 - Q1(k, cf_GBM, np.inf))
         else:
             raise ValueError("invalid type. Set 'call' or 'put'")
             
@@ -122,22 +124,20 @@ class BS_pricer():
         Time = return execution time if True
         """
         t_init = time()
-             
+
         S_T = self.exp_RV( self.S0, self.T, N )
         V = scp.mean( np.exp(-self.r*self.T) * self.payoff_f(S_T) )
-        
+
         if (Err == True):
-            if (Time == True):
-                elapsed = time()-t_init
-                return V, ss.sem(np.exp(-self.r*self.T) * self.payoff_f(S_T)), elapsed
-            else:
+            if Time != True:
                 return V, ss.sem(np.exp(-self.r*self.T) * self.payoff_f(S_T))
+            elapsed = time()-t_init
+            return V, ss.sem(np.exp(-self.r*self.T) * self.payoff_f(S_T)), elapsed
+        elif (Time == True):
+            elapsed = time()-t_init
+            return V, elapsed
         else:
-            if (Time == True):
-                elapsed = time()-t_init
-                return V, elapsed
-            else:
-                return V
+            return V
     
     
     
@@ -150,19 +150,19 @@ class BS_pricer():
         Solver = spsolve or splu or Thomas or SOR
         """
         t_init = time()
-        
-        Nspace = steps[0]   
+
+        Nspace = steps[0]
         Ntime = steps[1]
-        
-        S_max = 6*float(self.K)                
+
+        S_max = 6*float(self.K)
         S_min = float(self.K)/6
         x_max = np.log(S_max)
         x_min = np.log(S_min)
         x0 = np.log(self.S0)                            # current log-price
-        
-        x, dx = np.linspace(x_min, x_max, Nspace, retstep=True)  
+
+        x, dx = np.linspace(x_min, x_max, Nspace, retstep=True)
         t, dt = np.linspace(0, self.T, Ntime, retstep=True)
-        
+
         self.S_vec = np.exp(x)        # vector of S
         Payoff = self.payoff_f(self.S_vec)
 
@@ -175,75 +175,70 @@ class BS_pricer():
             V[:,-1] = Payoff
             V[-1,:] = 0
             V[0,:] = self.K * np.exp(-self.r* t[::-1] )
-        
-        sig2 = self.sig**2 
+
+        sig2 = self.sig**2
         dxx = dx**2
         a = ( (dt/2) * ( (self.r-0.5*sig2)/dx - sig2/dxx ) )
         b = ( 1 + dt * ( sig2/dxx + self.r ) )
         c = (-(dt/2) * ( (self.r-0.5*sig2)/dx + sig2/dxx ) )
-        
+
         D = sparse.diags([a, b, c], [-1, 0, 1], shape=(Nspace-2, Nspace-2)).tocsc()
-            
+
         offset = np.zeros(Nspace-2)
-        
-        
-        if solver == "spsolve":        
-            if self.exercise=="European":        
-                for i in range(Ntime-2,-1,-1):
+
+
+        if solver == "spsolve":    
+            for i in range(Ntime-2,-1,-1):
+                if self.exercise=="European":        
                     offset[0] = a * V[0,i]
                     offset[-1] = c * V[-1,i]
                     V[1:-1,i] = spsolve( D, (V[1:-1,i+1] - offset) )
-            elif self.exercise=="American":
-                for i in range(Ntime-2,-1,-1):
+                elif self.exercise=="American":
                     offset[0] = a * V[0,i]
                     offset[-1] = c * V[-1,i]
                     V[1:-1,i] = np.maximum( spsolve( D, (V[1:-1,i+1] - offset) ), Payoff[1:-1])
-        elif solver == "Thomas":        
-            if self.exercise=="European":        
-                for i in range(Ntime-2,-1,-1):
+        elif solver == "Thomas":    
+            for i in range(Ntime-2,-1,-1):
+                if self.exercise=="European":        
                     offset[0] = a * V[0,i]
                     offset[-1] = c * V[-1,i]
                     V[1:-1,i] = Thomas( D, (V[1:-1,i+1] - offset) )
-            elif self.exercise=="American":
-                for i in range(Ntime-2,-1,-1):
+                elif self.exercise=="American":
                     offset[0] = a * V[0,i]
                     offset[-1] = c * V[-1,i]
-                    V[1:-1,i] = np.maximum( Thomas( D, (V[1:-1,i+1] - offset) ), Payoff[1:-1]) 
-        elif solver == "SOR":        
-            if self.exercise=="European":        
-                for i in range(Ntime-2,-1,-1):
+                    V[1:-1,i] = np.maximum( Thomas( D, (V[1:-1,i+1] - offset) ), Payoff[1:-1])
+        elif solver == "SOR":    
+            for i in range(Ntime-2,-1,-1):
+                if self.exercise=="European":        
                     offset[0] = a * V[0,i]
                     offset[-1] = c * V[-1,i]
                     V[1:-1,i] = SOR( a,b,c, (V[1:-1,i+1] - offset), w=1.68, eps=1e-10, N_max=600 )
-            elif self.exercise=="American":
-                for i in range(Ntime-2,-1,-1):
+                elif self.exercise=="American":
                     offset[0] = a * V[0,i]
                     offset[-1] = c * V[-1,i]
-                    V[1:-1,i] = np.maximum( SOR( a,b,c, (V[1:-1,i+1] - offset), w=1.68, eps=1e-10, N_max=600 ), Payoff[1:-1]) 
+                    V[1:-1,i] = np.maximum( SOR( a,b,c, (V[1:-1,i+1] - offset), w=1.68, eps=1e-10, N_max=600 ), Payoff[1:-1])
         elif solver == "splu":
             DD = splu(D)
-            if self.exercise=="European":        
-                for i in range(Ntime-2,-1,-1):
+            for i in range(Ntime-2,-1,-1):
+                if self.exercise=="European":        
                     offset[0] = a * V[0,i]
                     offset[-1] = c * V[-1,i]
                     V[1:-1,i] = DD.solve( V[1:-1,i+1] - offset )
-            elif self.exercise=="American":
-                for i in range(Ntime-2,-1,-1):
+                elif self.exercise=="American":
                     offset[0] = a * V[0,i]
                     offset[-1] = c * V[-1,i]
                     V[1:-1,i] = np.maximum( DD.solve( V[1:-1,i+1] - offset ), Payoff[1:-1])
         else:
             raise ValueError("Solver is splu, spsolve, SOR or Thomas")    
-        
+
         self.price = np.interp(x0, x, V[:,0])
         self.price_vec = V[:,0]
         self.mesh = V
-        
-        if (Time == True):
-            elapsed = time()-t_init
-            return self.price, elapsed
-        else:
+
+        if Time != True:
             return self.price
+        elapsed = time()-t_init
+        return self.price, elapsed
     
     
        
@@ -290,15 +285,15 @@ class BS_pricer():
         
         if self.payoff!="put":
             raise ValueError("invalid type. Set 'call' or 'put'")
-        
+
         dt = self.T/(N-1)          # time interval
         df = np.exp(-self.r * dt)  # discount factor per time time interval
-        
+
         X0 = np.zeros((paths,1))
         increments = ss.norm.rvs(loc=(self.r-self.sig**2/2)*dt, scale=np.sqrt(dt)*self.sig, size=(paths,N-1))
         X = np.concatenate((X0,increments), axis=1).cumsum(1)
         S = self.S0 * np.exp(X)
-        
+
         H = np.maximum(self.K - S, 0)   # intrinsic values for put option
         V = np.zeros_like(H)            # value matrix
         V[:,-1] = H[:,-1]
@@ -308,15 +303,14 @@ class BS_pricer():
             good_paths = H[:,t] > 0    
             rg = np.polyfit( S[good_paths, t], V[good_paths, t+1] * df, 2)    # polynomial regression
             C = np.polyval( rg, S[good_paths,t] )                             # evaluation of regression  
-    
+
             exercise = np.zeros( len(good_paths), dtype=bool)
             exercise[good_paths] = H[good_paths,t] > C
-    
+
             V[exercise,t] = H[exercise,t]
             V[exercise,t+1:] = 0
             discount_path = (V[:,t] == 0)
             V[discount_path,t] = V[discount_path,t+1] * df
-    
-        V0 = np.mean(V[:,1]) * df  # 
-        return V0
+
+        return np.mean(V[:,1]) * df
         

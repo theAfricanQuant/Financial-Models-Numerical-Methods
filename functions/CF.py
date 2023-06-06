@@ -73,9 +73,16 @@ def cf_Heston(u, t, v0, mu, kappa, theta, sigma, rho):
     xi = kappa - sigma*rho*u*1j
     d = np.sqrt( xi**2 + sigma**2 * (u**2 + 1j*u) )
     g1 = (xi+d)/(xi-d)
-    cf = np.exp( 1j*u*mu*t + (kappa*theta)/(sigma**2) * ( (xi+d)*t - 2*np.log( (1-g1*np.exp(d*t))/(1-g1) ))\
-              + (v0/sigma**2)*(xi+d) * (1-np.exp(d*t))/(1-g1*np.exp(d*t)) )
-    return cf
+    return np.exp(
+        1j * u * mu * t
+        + (kappa * theta)
+        / (sigma**2)
+        * ((xi + d) * t - 2 * np.log((1 - g1 * np.exp(d * t)) / (1 - g1)))
+        + (v0 / sigma**2)
+        * (xi + d)
+        * (1 - np.exp(d * t))
+        / (1 - g1 * np.exp(d * t))
+    )
 
 
 def cf_Heston_good(u, t, v0, mu, kappa, theta, sigma, rho):
@@ -86,6 +93,13 @@ def cf_Heston_good(u, t, v0, mu, kappa, theta, sigma, rho):
     d = np.sqrt( xi**2 + sigma**2 * (u**2 + 1j*u) )
     g1 = (xi+d)/(xi-d)
     g2 = 1/g1
-    cf = np.exp( 1j*u*mu*t + (kappa*theta)/(sigma**2) * ( (xi-d)*t - 2*np.log( (1-g2*np.exp(-d*t))/(1-g2) ))\
-              + (v0/sigma**2)*(xi-d) * (1-np.exp(-d*t))/(1-g2*np.exp(-d*t)) )
-    return cf
+    return np.exp(
+        1j * u * mu * t
+        + (kappa * theta)
+        / (sigma**2)
+        * ((xi - d) * t - 2 * np.log((1 - g2 * np.exp(-d * t)) / (1 - g2)))
+        + (v0 / sigma**2)
+        * (xi - d)
+        * (1 - np.exp(-d * t))
+        / (1 - g2 * np.exp(-d * t))
+    )

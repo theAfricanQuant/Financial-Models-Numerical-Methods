@@ -31,8 +31,7 @@ class Diffusion_process():
 
     def exp_RV(self, S0, T, N):
         W = ss.norm.rvs( (self.r-0.5*self.sig**2)*T , np.sqrt(T)*self.sig, N)
-        S_T = S0 * np.exp(W)
-        return S_T
+        return S0 * np.exp(W)
 
 
 
@@ -51,10 +50,9 @@ class Merton_process():
         self.muJ = muJ
         if (sig<0 or sigJ<0):
             raise ValueError("sig and sigJ must be positive")
-        else:
-            self.sig = sig
-            self.sigJ = sigJ
-        
+        self.sig = sig
+        self.sigJ = sigJ
+
         # moments
         self.var = self.sig**2 + self.lam * self.sigJ**2 + self.lam * self.muJ**2
         self.skew = self.lam * (3* self.sigJ**2 * self.muJ + self.muJ**3) / self.var**(1.5)
@@ -65,8 +63,11 @@ class Merton_process():
         W = ss.norm.rvs(0, 1, N)              # The normal RV vector  
         P = ss.poisson.rvs(self.lam*T, size=N)    # Poisson random vector (number of jumps)
         Jumps = np.asarray([ss.norm.rvs(self.muJ, self.sigJ, ind).sum() for ind in P ]) # Jumps vector
-        S_T = S0 * np.exp( (self.r - 0.5*self.sig**2 -m )*T + np.sqrt(T)*self.sig*W + Jumps )     # Martingale exponential Merton
-        return S_T
+        return S0 * np.exp(
+            (self.r - 0.5 * self.sig**2 - m) * T
+            + np.sqrt(T) * self.sig * W
+            + Jumps
+        )
  
 
        
@@ -102,8 +103,7 @@ class VG_process():
         G = ss.gamma(rho * T).rvs(N) / rho     # The gamma RV
         Norm = ss.norm.rvs(0,1,N)              # The normal RV  
         VG = self.theta * G + self.sigma * np.sqrt(G) * Norm     # VG process at final time G
-        S_T = S0 * np.exp( (self.r-w)*T + VG )                 # Martingale exponential VG       
-        return S_T
+        return S0 * np.exp( (self.r-w)*T + VG )
     
     def path(self, T=1, N=10000, paths=1):
         """
@@ -116,8 +116,7 @@ class VG_process():
         G = ss.gamma( dt/self.kappa, scale=self.kappa).rvs( size=(paths,N-1) )     # The gamma RV
         Norm = ss.norm.rvs(loc=0, scale=1, size=(paths,N-1))                       # The normal RV  
         increments = self.c*dt + self.theta * G + self.sigma * np.sqrt(G) * Norm
-        X = np.concatenate((X0,increments), axis=1).cumsum(1)
-        return X
+        return np.concatenate((X0,increments), axis=1).cumsum(1)
  
     
     def fit_from_data(self, data, dt=1, method="Nelder-Mead"):
@@ -171,10 +170,9 @@ class Heston_process():
         self.rho = rho
         if (theta<0 or sigma<0 or kappa<0):
             raise ValueError("sigma,theta,kappa must be positive")
-        else:
-            self.theta = theta
-            self.sigma = sigma
-            self.kappa = kappa            
+        self.theta = theta
+        self.sigma = sigma
+        self.kappa = kappa            
     
     def path(self, S0, v0, N, T=1):
         """
@@ -224,25 +222,23 @@ class NIG_process():
         self.theta = theta
         if (sigma<0 or kappa<0):
             raise ValueError("sigma and kappa must be positive")
-        else:
-            self.sigma = sigma
-            self.kappa = kappa
-            
+        self.sigma = sigma
+        self.kappa = kappa
+
         # moments
-        self.var = self.sigma**2 + self.theta**2 * self.kappa 
-        self.skew = (3 * self.theta**3 * self.kappa**2 + 3*self.sigma**2 * self.theta * self.kappa) / (self.var**(1.5)) 
+        self.var = self.sigma**2 + self.theta**2 * self.kappa
+        self.skew = (3 * self.theta**3 * self.kappa**2 + 3*self.sigma**2 * self.theta * self.kappa) / (self.var**(1.5))
         self.kurt = ( 3*self.sigma**4 * self.kappa +18*self.sigma**2 * self.theta**2 \
-                     * self.kappa**2 + 15*self.theta**4 * self.kappa**3 ) / (self.var**2)
+                         * self.kappa**2 + 15*self.theta**4 * self.kappa**3 ) / (self.var**2)
 
     def exp_RV(self, S0, T, N):
         lam = T**2 / self.kappa     # scale for the IG process
         mu_s = T / lam              # scaled mean
-        w = ( 1 - np.sqrt( 1 - 2*self.theta*self.kappa -self.kappa*self.sigma**2) )/self.kappa 
+        w = ( 1 - np.sqrt( 1 - 2*self.theta*self.kappa -self.kappa*self.sigma**2) )/self.kappa
         IG = ss.invgauss.rvs(mu=mu_s, scale=lam, size=N)         # The IG RV
         Norm = ss.norm.rvs(0,1,N)                                # The normal RV  
         X = self.theta * IG + self.sigma * np.sqrt(IG) * Norm    # NIG random vector
-        S_T = S0 * np.exp( (self.r-w)*T + X )                    # exponential dynamics        
-        return S_T
+        return S0 * np.exp( (self.r-w)*T + X )
 
 
 
@@ -261,10 +257,9 @@ class GARCH():
     def __init__(self, VL=0.04, alpha=0.08, beta=0.9):
         if (VL<0 or alpha<=0 or beta<=0):
             raise ValueError("VL>=0, alpha>0 and beta>0")
-        else:
-            self.VL = VL
-            self.alpha = alpha
-            self.beta = beta
+        self.VL = VL
+        self.alpha = alpha
+        self.beta = beta
         self.gamma = 1 - self.alpha - self.beta
         self.omega = self.gamma * self.VL
         
@@ -347,10 +342,7 @@ class GARCH():
         for i in range(1,N):
             var = self.omega + self.alpha*R[i-1]**2 + self.beta*var    # variance update 
             log_lik += 0.5 * ( -log_2pi -np.log(var) - ( R[i]**2 / var )  )
-        if last_var==True:  
-            return log_lik, var
-        else:
-            return log_lik
+        return (log_lik, var) if last_var==True else log_lik
         
     def generate_var(self, R, R0, var0):
         """

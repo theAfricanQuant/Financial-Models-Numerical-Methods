@@ -26,20 +26,20 @@ def no_opt(x,y,cost_b,cost_s):
 def writer(x,y,cost_b,cost_s,K):
 
     cost = np.zeros( (len(x),len(y)) )
-    
+
     for i in range(len(x)):
         for j in range(len(y)):
-    
-            if y[j] < 0 and (1+cost_b) * np.exp(x[i]) <= K :
-                cost[i][j] = (1+cost_b) * y[j] * np.exp(x[i])
             
+            if y[j] < 0 and (1+cost_b) * np.exp(x[i]) <= K:
+                cost[i][j] = (1+cost_b) * y[j] * np.exp(x[i])
+
             elif y[j] >= 0 and (1+cost_b) * np.exp(x[i]) <= K : 
                 cost[i][j] = (1-cost_s) * y[j] * np.exp(x[i])
-        
-            elif y[j]-1 >= 0 and (1+cost_b) * np.exp(x[i]) > K :
+
+            elif y[j] >= 1 and (1 + cost_b) * np.exp(x[i]) > K:
                 cost[i][j] = ( (1-cost_s) * (y[j]-1) * np.exp(x[i]) ) + K
-        
-            elif y[j]-1 < 0 and (1+cost_b) * np.exp(x[i]) > K :
+
+            elif y[j] < 1 and (1 + cost_b) * np.exp(x[i]) > K:
                 cost[i][j] = ( (1+cost_b) * (y[j]-1) * np.exp(x[i]) ) + K
 
     return cost  
@@ -48,20 +48,20 @@ def writer(x,y,cost_b,cost_s,K):
 def buyer(x,y,cost_b,cost_s,K):
 
     cost = np.zeros( (len(x),len(y)) )
-    
+
     for i in range(len(x)):
         for j in range(len(y)):
-    
-            if y[j] < 0 and (1+cost_b) * np.exp(x[i]) <= K :
-                cost[i][j] = (1+cost_b) * y[j] * np.exp(x[i])
             
+            if y[j] < 0 and (1+cost_b) * np.exp(x[i]) <= K:
+                cost[i][j] = (1+cost_b) * y[j] * np.exp(x[i])
+
             elif y[j] >= 0 and (1+cost_b) * np.exp(x[i]) <= K : 
                 cost[i][j] = (1-cost_s) * y[j] * np.exp(x[i])
-        
-            elif y[j]+1 >= 0 and (1+cost_b) * np.exp(x[i]) > K :
+
+            elif y[j] >= -1 and (1 + cost_b) * np.exp(x[i]) > K:
                 cost[i][j] = ( (1-cost_s) * (y[j]+1) * np.exp(x[i]) ) - K
-        
-            elif y[j]+1 < 0 and (1+cost_b) * np.exp(x[i]) > K :
+
+            elif y[j] < -1 and (1 + cost_b) * np.exp(x[i]) > K:
                 cost[i][j] = ( (1+cost_b) * (y[j]+1) * np.exp(x[i]) ) - K
 
     return cost  

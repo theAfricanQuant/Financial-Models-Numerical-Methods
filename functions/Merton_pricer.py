@@ -76,12 +76,18 @@ class Merton_pricer():
         m = self.lam * (np.exp(self.muJ + (self.sigJ**2)/2) -1)    # coefficient m
         lam2 = self.lam * np.exp(self.muJ + (self.sigJ**2)/2)
 
-        tot=0
-        for i in range(18):
-            tot += ( np.exp(-lam2*self.T) * (lam2*self.T)**i / factorial(i) ) \
-            * BS_pricer.BlackScholes(self.payoff, self.S0, self.K, self.T, self.r-m+i*(self.muJ+0.5*self.sigJ**2)/self.T, 
-                                np.sqrt(self.sig**2 + (i*self.sigJ**2)/self.T) )  
-        return tot
+        return sum(
+            (np.exp(-lam2 * self.T) * (lam2 * self.T) ** i / factorial(i))
+            * BS_pricer.BlackScholes(
+                self.payoff,
+                self.S0,
+                self.K,
+                self.T,
+                self.r - m + i * (self.muJ + 0.5 * self.sigJ**2) / self.T,
+                np.sqrt(self.sig**2 + (i * self.sigJ**2) / self.T),
+            )
+            for i in range(18)
+        )
            
     
     def Fourier_inversion(self):
@@ -91,13 +97,15 @@ class Merton_pricer():
         k = np.log(self.K/self.S0)                # log moneyness
         m = self.lam * (np.exp(self.muJ + (self.sigJ**2)/2) -1)    # coefficient m
         cf_Mert = partial(cf_mert, t=self.T, mu=( self.r - 0.5 * self.sig**2 -m ), sig=self.sig, lam=self.lam, muJ=self.muJ, sigJ=self.sigJ )
-        
+
         if self.payoff == "call":
-            call = self.S0 * Q1(k, cf_Mert, np.inf) - self.K * np.exp(-self.r*self.T) * Q2(k, cf_Mert, np.inf)   # pricing function
-            return call
+            return self.S0 * Q1(k, cf_Mert, np.inf) - self.K * np.exp(
+                -self.r * self.T
+            ) * Q2(k, cf_Mert, np.inf)
         elif self.payoff == "put":
-            put = self.K * np.exp(-self.r*self.T) * (1 - Q2(k, cf_Mert, np.inf)) - self.S0 * (1-Q1(k, cf_Mert, np.inf))  # pricing function
-            return put
+            return self.K * np.exp(-self.r * self.T) * (
+                1 - Q2(k, cf_Mert, np.inf)
+            ) - self.S0 * (1 - Q1(k, cf_Mert, np.inf))
         else:
             raise ValueError("invalid type. Set 'call' or 'put'")
 
@@ -110,22 +118,20 @@ class Merton_pricer():
         Time = return execution time if True
         """
         t_init = time()
-             
+
         S_T = self.exp_RV( self.S0, self.T, N )
         V = scp.mean( np.exp(-self.r*self.T) * self.payoff_f(S_T) )
-        
+
         if (Err == True):
-            if (Time == True):
-                elapsed = time()-t_init
-                return V, ss.sem(np.exp(-self.r*self.T) * self.payoff_f(S_T)), elapsed
-            else:
+            if Time != True:
                 return V, ss.sem(np.exp(-self.r*self.T) * self.payoff_f(S_T))
+            elapsed = time()-t_init
+            return V, ss.sem(np.exp(-self.r*self.T) * self.payoff_f(S_T)), elapsed
+        elif (Time == True):
+            elapsed = time()-t_init
+            return V, elapsed
         else:
-            if (Time == True):
-                elapsed = time()-t_init
-                return V, elapsed
-            else:
-                return V
+            return V
             
             
     
@@ -137,75 +143,73 @@ class Merton_pricer():
         Time = Boolean. Execution time.
         """
         t_init = time()
-        
-        Nspace = steps[0]   
+
+        Nspace = steps[0]
         Ntime = steps[1]
-        
-        S_max = 6*float(self.K)                
+
+        S_max = 6*float(self.K)
         S_min = float(self.K)/6
         x_max = np.log(S_max)
         x_min = np.log(S_min)
-        
+
         dev_X = np.sqrt(self.lam * self.sigJ**2 + self.lam * self.muJ**2)
-        
+
         dx = (x_max - x_min)/(Nspace-1)
         extraP = int(np.floor(5*dev_X/dx))         # extra points beyond the B.C.
         x = np.linspace(x_min-extraP*dx, x_max+extraP*dx, Nspace + 2*extraP)   # space discretization
         t, dt = np.linspace(0, self.T, Ntime, retstep=True)       # time discretization
-        
+
         Payoff = self.payoff_f(np.exp(x))
         offset = np.zeros(Nspace-2)
         V = np.zeros((Nspace + 2*extraP, Ntime))       # grid initialization
-        
+
         if self.payoff == "call":
             V[:,-1] = Payoff                   # terminal conditions 
             V[-extraP-1:,:] = np.exp(x[-extraP-1:]).reshape(extraP+1,1) * np.ones((extraP+1,Ntime)) - \
-                 self.K * np.exp(-self.r* t[::-1] ) * np.ones((extraP+1,Ntime))  # boundary condition
+                     self.K * np.exp(-self.r* t[::-1] ) * np.ones((extraP+1,Ntime))  # boundary condition
             V[:extraP+1,:] = 0
         else:    
             V[:,-1] = Payoff
             V[-extraP-1:,:] = 0
             V[:extraP+1,:] = self.K * np.exp(-self.r* t[::-1] ) * np.ones((extraP+1,Ntime))
-        
-        
+
+
         cdf = ss.norm.cdf([np.linspace(-(extraP+1+0.5)*dx, (extraP+1+0.5)*dx, 2*(extraP+2) )], loc=self.muJ, scale=self.sigJ)[0]
         nu = self.lam * (cdf[1:] - cdf[:-1])        
-        
+
         lam_appr = sum(nu)
         m_appr = np.array([ np.exp(i*dx)-1 for i in range(-(extraP+1), extraP+2)]) @ nu
-        
-        sig2 = self.sig**2 
+
+        sig2 = self.sig**2
         dxx = dx**2
         a = ( (dt/2) * ( (self.r -m_appr -0.5*sig2)/dx - sig2/dxx ) )
         b = ( 1 + dt * ( sig2/dxx + self.r + lam_appr) )
         c = (-(dt/2) * ( (self.r -m_appr -0.5*sig2)/dx + sig2/dxx ) )
-        
+
         D = sparse.diags([a, b, c], [-1, 0, 1], shape=(Nspace-2, Nspace-2)).tocsc()
         DD = splu(D)
-        if self.exercise=="European":        
-            for i in range(Ntime-2,-1,-1):
+        for i in range(Ntime-2,-1,-1):
+            if self.exercise=="European":
                 offset[0] = a * V[extraP,i]
                 offset[-1] = c * V[-1-extraP,i]
                 V_jump = V[extraP+1 : -extraP-1, i+1] + dt * signal.convolve(V[:,i+1],nu[::-1],mode="valid",method="fft")
                 V[extraP+1 : -extraP-1, i] = DD.solve( V_jump - offset )
-        elif self.exercise=="American":
-            for i in range(Ntime-2,-1,-1):
+            elif self.exercise=="American":
                 offset[0] = a * V[extraP,i]
                 offset[-1] = c * V[-1-extraP,i]
                 V_jump = V[extraP+1 : -extraP-1, i+1] + dt * signal.convolve(V[:,i+1],nu[::-1],mode="valid",method="fft")
                 V[extraP+1 : -extraP-1, i] = np.maximum( DD.solve( V_jump - offset ), Payoff[extraP+1 : -extraP-1] )
-                
+
         X0 = np.log(self.S0)                            # current log-price
         self.S_vec = np.exp(x[extraP+1 : -extraP-1])        # vector of S
         self.price = np.interp(X0, x, V[:,0])
         self.price_vec = V[extraP+1 : -extraP-1,0]
         self.mesh = V[extraP+1 : -extraP-1, :]
-        
-        if (Time == True):
-            elapsed = time()-t_init
-            return self.price, elapsed
-        else:
+
+        if Time != True:
             return self.price
+        elapsed = time()-t_init
+        return self.price, elapsed
 
 
     def plot(self, axis=None):

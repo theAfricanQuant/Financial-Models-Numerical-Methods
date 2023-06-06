@@ -73,15 +73,17 @@ class NIG_pricer():
         """
         k = np.log(self.K/self.S0)                # log moneyness
         w = ( 1 - np.sqrt( 1 - 2*self.theta*self.kappa -self.kappa*self.sigma**2) )/self.kappa # martingale correction
-        
+
         cf_NIG_b = partial(cf_NIG, t=self.T, mu=(self.r-w), theta=self.theta, sigma=self.sigma, kappa=self.kappa )
-        
+
         if self.payoff == "call":
-            call = self.S0 * Q1(k, cf_NIG_b, np.inf) - self.K * np.exp(-self.r*self.T) * Q2(k, cf_NIG_b, np.inf)   # pricing function
-            return call
+            return self.S0 * Q1(k, cf_NIG_b, np.inf) - self.K * np.exp(
+                -self.r * self.T
+            ) * Q2(k, cf_NIG_b, np.inf)
         elif self.payoff == "put":
-            put = self.K * np.exp(-self.r*self.T) * (1 - Q2(k, cf_NIG_b, np.inf)) - self.S0 * (1-Q1(k, cf_NIG_b, np.inf))  # pricing function
-            return put
+            return self.K * np.exp(-self.r * self.T) * (
+                1 - Q2(k, cf_NIG_b, np.inf)
+            ) - self.S0 * (1 - Q1(k, cf_NIG_b, np.inf))
         else:
             raise ValueError("invalid type. Set 'call' or 'put'")
 
@@ -94,22 +96,20 @@ class NIG_pricer():
         Time = return execution time if True
         """
         t_init = time()
-             
+
         S_T = self.exp_RV( self.S0, self.T, N )
         V = scp.mean( np.exp(-self.r*self.T) * self.payoff_f(S_T) )
-        
+
         if (Err == True):
-            if (Time == True):
-                elapsed = time()-t_init
-                return V, ss.sem(np.exp(-self.r*self.T) * self.payoff_f(S_T)), elapsed
-            else:
+            if Time != True:
                 return V, ss.sem(np.exp(-self.r*self.T) * self.payoff_f(S_T))
+            elapsed = time()-t_init
+            return V, ss.sem(np.exp(-self.r*self.T) * self.payoff_f(S_T)), elapsed
+        elif (Time == True):
+            elapsed = time()-t_init
+            return V, elapsed
         else:
-            if (Time == True):
-                elapsed = time()-t_init
-                return V, elapsed
-            else:
-                return V        
+            return V        
     
     
     
@@ -129,36 +129,36 @@ class NIG_pricer():
         Time = Boolean. Execution time.
         """
         t_init = time()
-        
-        Nspace = steps[0]   
+
+        Nspace = steps[0]
         Ntime = steps[1]
-        
-        S_max = 2000*float(self.K)                
+
+        S_max = 2000*float(self.K)
         S_min = float(self.K)/2000
         x_max = np.log(S_max)
         x_min = np.log(S_min)
-        
+
         dev_X = np.sqrt(self.sigma**2 + self.theta**2 * self.kappa)     # std dev NIG process
-        
+
         dx = (x_max - x_min)/(Nspace-1)
         extraP = int(np.floor(7*dev_X/dx))            # extra points beyond the B.C.
         x = np.linspace(x_min-extraP*dx, x_max+extraP*dx, Nspace + 2*extraP)   # space discretization
         t, dt = np.linspace(0, self.T, Ntime, retstep=True)       # time discretization
-        
+
         Payoff = self.payoff_f(np.exp(x))
         offset = np.zeros(Nspace-2)
         V = np.zeros((Nspace + 2*extraP, Ntime))       # grid initialization
-        
+
         if self.payoff == "call":
             V[:,-1] = Payoff                   # terminal conditions 
             V[-extraP-1:,:] = np.exp(x[-extraP-1:]).reshape(extraP+1,1) * np.ones((extraP+1,Ntime)) - \
-                 self.K * np.exp(-self.r* t[::-1] ) * np.ones((extraP+1,Ntime))  # boundary condition
+                     self.K * np.exp(-self.r* t[::-1] ) * np.ones((extraP+1,Ntime))  # boundary condition
             V[:extraP+1,:] = 0
         else:    
             V[:,-1] = Payoff
             V[-extraP-1:,:] = 0
             V[:extraP+1,:] = self.K * np.exp(-self.r* t[::-1] ) * np.ones((extraP+1,Ntime))
-        
+
 
         eps = 1.5*dx    # the cutoff near 0
         lam = quad(self.NIG_measure,-(extraP+1.5)*dx,-eps)[0] + quad(self.NIG_measure,eps,(extraP+1.5)*dx)[0] # approximated intensity
@@ -168,49 +168,46 @@ class NIG_pricer():
 
         w = quad(int_w, -(extraP+1.5)*dx, -eps)[0] + quad(int_w, eps, (extraP+1.5)*dx)[0]   # is the approx of w
         sig2 = quad(int_s, -eps, eps, points=0)[0]         # the small jumps variance
-        
-        
+
+
         dxx = dx * dx
         a = ( (dt/2) * ( (self.r - w - 0.5*sig2)/dx - sig2/dxx ) )
         b = ( 1 + dt * ( sig2/dxx + self.r + lam) )
         c = (-(dt/2) * ( (self.r - w - 0.5*sig2)/dx + sig2/dxx ) )
         D = sparse.diags([a, b, c], [-1, 0, 1], shape=(Nspace-2, Nspace-2)).tocsc()
         DD = splu(D)
-       
+
         nu = np.zeros(2*extraP+3)        # Lévy measure vector
         x_med = extraP+1                 # middle point in nu vector
         x_nu = np.linspace(-(extraP+1+0.5)*dx, (extraP+1+0.5)*dx, 2*(extraP+2) )    # integration domain
         for i in range(len(nu)):
-            if (i==x_med) or (i==x_med-1) or (i==x_med+1):
+            if i in [x_med, x_med - 1, x_med + 1]:
                 continue
             nu[i] = quad(self.NIG_measure, x_nu[i], x_nu[i+1])[0]
 
 
-        if self.exercise=="European":        
-            # Backward iteration
-            for i in range(Ntime-2,-1,-1):
+        for i in range(Ntime-2,-1,-1):
+            if self.exercise=="European":
                 offset[0] = a * V[extraP,i]
                 offset[-1] = c * V[-1-extraP,i]
                 V_jump = V[extraP+1 : -extraP-1, i+1] + dt * signal.convolve(V[:,i+1],nu[::-1],mode="valid",method="auto")
-                V[extraP+1 : -extraP-1, i] = DD.solve( V_jump - offset ) 
-        elif self.exercise=="American":
-            for i in range(Ntime-2,-1,-1):
+                V[extraP+1 : -extraP-1, i] = DD.solve( V_jump - offset )
+            elif self.exercise=="American":
                 offset[0] = a * V[extraP,i]
                 offset[-1] = c * V[-1-extraP,i]
                 V_jump = V[extraP+1 : -extraP-1, i+1] + dt * signal.convolve(V[:,i+1],nu[::-1],mode="valid",method="auto")
                 V[extraP+1 : -extraP-1, i] = np.maximum( DD.solve( V_jump - offset ), Payoff[extraP+1 : -extraP-1] )
-                
+
         X0 = np.log(self.S0)                            # current log-price
         self.S_vec = np.exp(x[extraP+1 : -extraP-1])        # vector of S
         self.price = np.interp(X0, x, V[:,0])
         self.price_vec = V[extraP+1 : -extraP-1,0]
         self.mesh = V[extraP+1 : -extraP-1, :]
-        
-        if (Time == True):
-            elapsed = time()-t_init
-            return self.price, elapsed
-        else:
+
+        if Time != True:
             return self.price
+        elapsed = time()-t_init
+        return self.price, elapsed
 
 
     def plot(self, axis=None):
